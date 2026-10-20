@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header'
 import { ApiError } from '@/lib/api-client'
 import { useWorkspace } from '@/features/workspaces/workspace-context'
 import { TaskSheet } from '@/features/tasks/components/task-sheet'
+import { BoardAIActions } from '@/features/ai/components/board-ai-actions'
 import { BoardActions } from '../components/board-actions'
 import { KanbanBoard } from '../components/kanban-board'
 import { useBoard } from '../hooks'
@@ -70,7 +71,13 @@ export default function BoardPage() {
       <PageHeader
         title={board.name}
         description={board.description}
-        actions={can('admin') && <BoardActions workspaceId={workspaceId} board={board} />}
+        actions={
+          <>
+            {/* Keyed by board so the chat starts fresh on every board. */}
+            <BoardAIActions key={board.id} board={board} canEditTasks={can('member')} />
+            {can('admin') && <BoardActions workspaceId={workspaceId} board={board} />}
+          </>
+        }
       />
       <KanbanBoard
         board={board}

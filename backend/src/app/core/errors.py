@@ -38,6 +38,21 @@ class ValidationError(AppError):
     default_code = "validation_error"
 
 
+class BadGateway(AppError):
+    status_code = 502
+    default_code = "bad_gateway"
+
+
+class ServiceUnavailable(AppError):
+    status_code = 503
+    default_code = "service_unavailable"
+
+
+class GatewayTimeout(AppError):
+    status_code = 504
+    default_code = "gateway_timeout"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:

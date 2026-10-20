@@ -17,6 +17,7 @@ type Query = Record<string, string | number | boolean | null | undefined>
 interface RequestOptions {
   body?: unknown
   query?: Query
+  signal?: AbortSignal
 }
 
 function buildUrl(path: string, query?: Query) {
@@ -39,7 +40,8 @@ function handleUnauthorized(path: string) {
   }
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+/** Sends the request and throws `ApiError` for network failures and non-2xx responses. */
+async function send(method: string, path: string, opts: RequestOptions = {}): Promise<Response> {
   const headers: Record<string, string> = {}
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
@@ -51,8 +53,10 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
       method,
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: opts.signal,
     })
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new ApiError(0, 'Нет соединения с сервером', 'network_error')
   }
 
@@ -67,7 +71,11 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
     const detail = typeof body?.detail === 'string' ? body.detail : res.statusText || 'Ошибка запроса'
     throw new ApiError(res.status, detail, body?.code)
   }
+  return res
+}
 
+async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+  const res = await send(method, path, opts)
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
@@ -77,6 +85,8 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, { body: body ?? {} }),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, { body }),
   delete: <T = void>(path: string) => request<T>('DELETE', path),
+  /** POST that hands back the raw response so the caller can read a streamed body. */
+  stream: (path: string, body: unknown, signal?: AbortSignal) => send('POST', path, { body, signal }),
 }
 
 export function errorMessage(err: unknown): string {

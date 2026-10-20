@@ -24,6 +24,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:8080"]}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      # По умолчанию — Ollama, запущенная на хосте (на macOS только так работает GPU/Metal).
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
@@ -36,5 +43,15 @@ services:
     depends_on:
       - backend
 
+  # Необязательно: Ollama в контейнере (Linux/без локальной установки). Включается так:
+  #   OLLAMA_BASE_URL=http://ollama:11434 docker compose --profile ollama up --build
+  #   docker compose exec ollama ollama pull qwen2.5:3b
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama:/root/.ollama
+
 volumes:
   pgdata:
+  ollama:

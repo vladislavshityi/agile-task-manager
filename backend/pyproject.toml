@@ -8,6 +8,7 @@ dependencies = [
     "asyncpg>=0.32.0",
     "email-validator>=2.3.0",
     "fastapi>=0.145.0",
+    "httpx>=0.28.1",
     "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.0",
     "pyjwt>=2.15.1",
@@ -24,7 +25,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.17.1",
@@ -37,6 +37,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+# Russian UI strings and LLM prompts are full of "confusable" Cyrillic letters.
+ignore = ["RUF001"]
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/**" = ["E501"]

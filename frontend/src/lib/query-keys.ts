@@ -10,5 +10,6 @@ export const qk = {
   myTasks: (wid: string, from?: string, to?: string) =>
     ['workspaces', wid, 'my-tasks', from ?? '', to ?? ''] as const,
   myTasksAll: (wid: string) => ['workspaces', wid, 'my-tasks'] as const,
+  aiStatus: ['ai', 'status'] as const,
   invitePreview: (token: string) => ['invites', token] as const,
 }

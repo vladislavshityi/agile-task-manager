@@ -111,6 +111,23 @@ export interface Board {
   columns: Column[]
 }
 
+export interface AIStatus {
+  enabled: boolean
+  available: boolean
+  model: string
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface TaskDraft {
+  title: string
+  description: string
+  priority: Priority
+}
+
 export interface ApiErrorBody {
   detail: string
   code: string

@@ -5,9 +5,11 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FormField } from '@/components/form-field'
 import { errorMessage } from '@/lib/api-client'
+import { SuggestDescriptionButton } from '@/features/ai/components/suggest-description-button'
 import type { TaskDetail } from '@/types/api'
 import { useUpdateTask } from '../hooks'
 
@@ -24,6 +26,7 @@ export function TaskTextForm({ task, readOnly }: { task: TaskDetail; readOnly: b
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -46,7 +49,19 @@ export function TaskTextForm({ task, readOnly }: { task: TaskDetail; readOnly: b
       <FormField label="Название" htmlFor="task-title" error={errors.title?.message}>
         <Input id="task-title" readOnly={readOnly} className="h-10 text-base font-medium" {...register('title')} />
       </FormField>
-      <FormField label="Описание" htmlFor="task-desc">
+      <div className="grid gap-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="task-desc">Описание</Label>
+          {!readOnly && (
+            <SuggestDescriptionButton
+              taskId={task.id}
+              onSuggest={(text) => {
+                setValue('description', text, { shouldDirty: true })
+                toast.info('Проверьте описание и нажмите «Сохранить»')
+              }}
+            />
+          )}
+        </div>
         <Textarea
           id="task-desc"
           rows={5}
@@ -54,7 +69,7 @@ export function TaskTextForm({ task, readOnly }: { task: TaskDetail; readOnly: b
           placeholder={readOnly ? 'Нет описания' : 'Добавьте описание…'}
           {...register('description')}
         />
-      </FormField>
+      </div>
       {!readOnly && isDirty && (
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => reset()}>

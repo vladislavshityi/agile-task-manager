@@ -8,6 +8,7 @@ import app.models
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import register_exception_handlers
+from app.modules.ai.router import router as ai_router
 from app.modules.auth.router import router as auth_router
 from app.modules.boards.router import router as boards_router
 from app.modules.tasks.router import router as tasks_router
@@ -32,7 +33,14 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     api = APIRouter(prefix="/api")
-    for router in (auth_router, users_router, workspaces_router, boards_router, tasks_router):
+    for router in (
+        auth_router,
+        users_router,
+        workspaces_router,
+        boards_router,
+        tasks_router,
+        ai_router,
+    ):
         api.include_router(router)
 
     @api.get("/health", tags=["meta"])

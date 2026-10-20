@@ -9,6 +9,7 @@ import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
@@ -64,10 +65,13 @@ async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         await transaction.rollback()
 
 
-@pytest_asyncio.fixture
-async def client(session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app()
+@pytest.fixture
+def app() -> FastAPI:
+    return create_app()
 
+
+@pytest_asyncio.fixture
+async def client(app: FastAPI, session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
     async def override_session() -> AsyncIterator[AsyncSession]:
         try:
             yield session
