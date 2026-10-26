@@ -12,6 +12,7 @@ import WorkspaceLayout from '@/features/workspaces/pages/workspace-layout'
 const BoardPage = lazy(() => import('@/features/boards/pages/board-page'))
 const MyTasksPage = lazy(() => import('@/features/tasks/pages/my-tasks-page'))
 const CalendarPage = lazy(() => import('@/features/tasks/pages/calendar-page'))
+const WikiPage = lazy(() => import('@/features/wiki/pages/wiki-page'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings-page'))
 
 const lazyPage = (el: React.ReactNode) => <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>{el}</Suspense>
@@ -32,6 +33,8 @@ export const router = createBrowserRouter([
           { path: 'b/:boardId', element: lazyPage(<BoardPage />) },
           { path: 'my-tasks', element: lazyPage(<MyTasksPage />) },
           { path: 'calendar', element: lazyPage(<CalendarPage />) },
+          { path: 'wiki', element: lazyPage(<WikiPage />) },
+          { path: 'wiki/:pageId', element: lazyPage(<WikiPage />) },
           { path: 'settings', element: lazyPage(<SettingsPage />) },
         ],
       },

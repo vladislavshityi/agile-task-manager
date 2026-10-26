@@ -138,3 +138,71 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Rendered Markdown of wiki pages. */
+@layer components {
+  .wiki-prose {
+    @apply text-[15px] leading-relaxed break-words;
+  }
+  .wiki-prose > * + * {
+    @apply mt-3;
+  }
+  .wiki-prose h1 {
+    @apply mt-6 text-2xl font-semibold;
+  }
+  .wiki-prose h2 {
+    @apply mt-6 border-b pb-1 text-xl font-semibold;
+  }
+  .wiki-prose h3 {
+    @apply mt-5 text-lg font-semibold;
+  }
+  .wiki-prose h4 {
+    @apply mt-4 font-semibold;
+  }
+  .wiki-prose a {
+    @apply text-primary underline-offset-2 hover:underline;
+  }
+  .wiki-prose ul {
+    @apply list-disc pl-6;
+  }
+  .wiki-prose ol {
+    @apply list-decimal pl-6;
+  }
+  .wiki-prose li + li {
+    @apply mt-1;
+  }
+  .wiki-prose li:has(> input[type='checkbox']) {
+    @apply list-none -ml-5;
+  }
+  .wiki-prose input[type='checkbox'] {
+    @apply mr-1.5 align-middle;
+  }
+  .wiki-prose blockquote {
+    @apply border-l-4 pl-4 text-muted-foreground;
+  }
+  .wiki-prose code {
+    @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.85em];
+  }
+  .wiki-prose pre {
+    @apply overflow-x-auto rounded-xl bg-muted p-4 text-sm;
+  }
+  .wiki-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .wiki-prose table {
+    @apply block w-full overflow-x-auto border-collapse text-sm;
+  }
+  .wiki-prose th,
+  .wiki-prose td {
+    @apply border px-3 py-1.5 text-left;
+  }
+  .wiki-prose th {
+    @apply bg-muted font-semibold;
+  }
+  .wiki-prose hr {
+    @apply my-6;
+  }
+  .wiki-prose img {
+    @apply max-w-full rounded-xl;
+  }
+}

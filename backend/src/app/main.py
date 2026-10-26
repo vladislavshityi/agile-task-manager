@@ -13,6 +13,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.boards.router import router as boards_router
 from app.modules.tasks.router import router as tasks_router
 from app.modules.users.router import router as users_router
+from app.modules.wiki.router import router as wiki_router
 from app.modules.workspaces.router import router as workspaces_router
 
 
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         workspaces_router,
         boards_router,
         tasks_router,
+        wiki_router,
         ai_router,
     ):
         api.include_router(router)

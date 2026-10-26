@@ -128,6 +128,22 @@ export interface TaskDraft {
   priority: Priority
 }
 
+export interface WikiPageSummary {
+  id: string
+  parent_id: string | null
+  title: string
+  position: number
+  updated_at: string
+}
+
+export interface WikiPage extends WikiPageSummary {
+  workspace_id: string
+  content: string
+  created_at: string
+  created_by: User
+  updated_by: User
+}
+
 export interface ApiErrorBody {
   detail: string
   code: string
