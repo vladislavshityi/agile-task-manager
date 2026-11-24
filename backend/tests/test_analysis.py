@@ -273,3 +273,16 @@ async def test_non_member_gets_404(
         headers=stranger.headers,
     )
     assert created.status_code == 404
+
+
+async def test_create_from_multipart_text_file(client: httpx.AsyncClient, owner: Account):
+    response = await client.post(
+        f"/workspaces/{owner.workspace_id}/analyses",
+        data={"title": "Файл"},
+        files={"file": ("spec.txt", "# Заголовок\n\nТребование.".encode(), "text/plain")},
+        headers=owner.headers,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["text"] == "# Заголовок\n\nТребование."
+    assert body["fragment_count"] == 2

@@ -100,11 +100,15 @@ class AnalysisService:
         )
 
     async def create(
-        self, user: User, workspace_id: uuid.UUID, data: AnalysisCreate
+        self,
+        user: User,
+        workspace_id: uuid.UUID,
+        data: AnalysisCreate,
+        heading_hints: dict[int, int] | None = None,
     ) -> AnalysisRead:
         await require_role(self.session, workspace_id, user.id, Role.member)
         text = normalize(data.text)
-        fragments = split(text)
+        fragments = split(text, heading_hints)
         if not any(f.kind != FragmentKind.heading for f in fragments):
             raise ValidationError("The specification has no text to analyze", "spec_empty")
         if len(fragments) > MAX_FRAGMENTS:
