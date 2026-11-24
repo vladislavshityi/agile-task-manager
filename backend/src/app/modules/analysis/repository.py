@@ -54,12 +54,6 @@ class AnalysisRepository:
         )
         return [(analysis, total) for analysis, total in result.all()]
 
-    async def fragment_count(self, analysis_id: uuid.UUID) -> int:
-        result = await self.session.execute(
-            select(func.count(SpecFragment.id)).where(SpecFragment.analysis_id == analysis_id)
-        )
-        return result.scalar_one()
-
     async def get_member(self, analysis_id: uuid.UUID, user_id: uuid.UUID) -> AnalysisMember | None:
         return await self.session.get(AnalysisMember, (analysis_id, user_id))
 

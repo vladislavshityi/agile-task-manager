@@ -1,3 +1,8 @@
+import re
+from pathlib import Path
+
+import pytest
+
 from app.modules.analysis.splitter import MAX_FRAGMENT_CHARS, normalize, split
 
 MIXED = """# Требования к системе
@@ -123,3 +128,277 @@ def test_section_and_path_of_paragraphs():
 def test_text_before_first_heading_has_empty_section():
     first = split(normalize("Вступление.\n\n# Раздел"))[0]
     assert (first.section, first.heading_path) == ("", "")
+
+
+def _view(text, hints=None):
+    text = normalize(text)
+    fragments = split(text, hints)
+    for f in fragments:
+        assert text[f.start : f.end] == f.text
+        assert f.text == f.text.strip()
+    return fragments
+
+
+def _kinds(text, hints=None):
+    return [(f.kind, f.text) for f in _view(text, hints)]
+
+
+def test_number_led_paragraph_without_dot_is_not_heading():
+    assert _kinds("2024 год был успешным") == [("paragraph", "2024 год был успешным")]
+    assert _kinds("Вступление.\n\n100 пользователей должны работать одновременно") == [
+        ("paragraph", "Вступление."),
+        ("paragraph", "100 пользователей должны работать одновременно"),
+    ]
+    assert _kinds("Итоги.\n\n10 пользователей онлайн\n\nКонец.")[1][0] == "paragraph"
+
+
+def test_word_paste_without_blank_lines():
+    text = (
+        "1. Общие положения\nНастоящий документ определяет требования.\n"
+        "1.1 Назначение\nСистема предназначена для учёта задач.\nОна проста в работе."
+    )
+    fragments = _view(text)
+    assert [(f.kind, f.section, f.text) for f in fragments] == [
+        ("heading", "1", "1. Общие положения"),
+        ("paragraph", "1", "Настоящий документ определяет требования."),
+        ("heading", "1.1", "1.1 Назначение"),
+        ("paragraph", "1.1", "Система предназначена для учёта задач."),
+        ("paragraph", "1.1", "Она проста в работе."),
+    ]
+
+
+def test_numbered_requirement_keeps_own_section_and_is_paragraph():
+    fragments = _view("4. Требования\n4.1.2 Система должна хранить данные.\nПоясняющий текст.")
+    assert [(f.kind, f.section) for f in fragments] == [
+        ("heading", "4"),
+        ("paragraph", "4.1.2"),
+        ("paragraph", "4"),
+    ]
+    assert fragments[1].text == "4.1.2 Система должна хранить данные."
+
+
+def test_decimal_number_in_prose_is_plain_paragraph():
+    fragment = _view("Раздел\n\n1.5 млн рублей выделено на проект.")[1]
+    assert (fragment.kind, fragment.section) == ("paragraph", "1")
+
+
+def test_caps_and_named_and_roman_headings():
+    text = (
+        "ОБЩИЕ ПОЛОЖЕНИЯ\nТекст один.\n"
+        "Раздел 3. Интеграции\nТекст два.\n"
+        "Глава 2\nТекст три.\n"
+        "Приложение Б\nТекст четыре.\n"
+        "IV. Архитектура\nТекст пять."
+    )
+    heads = [(f.section, f.text) for f in _view(text) if f.kind == "heading"]
+    assert heads == [
+        ("1", "ОБЩИЕ ПОЛОЖЕНИЯ"),
+        ("3", "Раздел 3. Интеграции"),
+        ("2", "Глава 2"),
+        ("ПБ", "Приложение Б"),
+        ("IV", "IV. Архитектура"),
+    ]
+
+
+def test_sentence_starting_with_section_word_is_paragraph():
+    assert _kinds("Раздел 5 описывает интеграции с другими системами") == [
+        ("paragraph", "Раздел 5 описывает интеграции с другими системами")
+    ]
+
+
+def test_bold_line_is_heading_with_offsets_without_stars():
+    text = normalize("# Документ\n\n**Роли**\n\nТекст.")
+    fragments = split(text)
+    bold = fragments[1]
+    assert (bold.kind, bold.text, bold.section) == ("heading", "Роли", "2")
+    assert text[bold.start : bold.end] == "Роли"
+    assert _kinds("**Система должна работать быстро**\n\nТекст.")[0][0] == "paragraph"
+
+
+def test_setext_headings_and_underline_is_not_a_fragment():
+    fragments = _view("Заголовок\n=====\n\nТекст.\n\nПодраздел\n-----\n\nЕщё текст.")
+    assert [(f.kind, f.section, f.text) for f in fragments] == [
+        ("heading", "1", "Заголовок"),
+        ("paragraph", "1", "Текст."),
+        ("heading", "1.1", "Подраздел"),
+        ("paragraph", "1.1", "Ещё текст."),
+    ]
+
+
+def test_typical_section_names_without_number():
+    text = "Введение\nТекст.\nТермины и определения\nСлово — значение.\nТребования к приёмке\nЕщё."
+    heads = [f.text for f in _view(text) if f.kind == "heading"]
+    assert heads == ["Введение", "Термины и определения", "Требования к приёмке"]
+
+
+def test_standalone_short_line_is_heading_only_between_blank_and_content():
+    fragments = _view("Вступление.\n\nКонтекст проекта\n\nЗдесь живёт описание.\n\nКонец")
+    assert [(f.kind, f.text) for f in fragments] == [
+        ("paragraph", "Вступление."),
+        ("heading", "Контекст проекта"),
+        ("paragraph", "Здесь живёт описание."),
+        ("paragraph", "Конец"),
+    ]
+
+
+def test_short_numbered_sequence_is_list_not_headings():
+    assert _kinds("Шаги:\n1. Вход\n2. Выход\n3. Профиль\nДальше обычный текст.") == [
+        ("list_item", "1. Вход"),
+        ("list_item", "2. Выход"),
+        ("list_item", "3. Профиль"),
+        ("paragraph", "Дальше обычный текст."),
+    ]
+
+
+def test_hard_wrapped_lines_are_joined_but_not_across_sentences():
+    text = "Первое предложение закончено.\nВторая строка\nпродолжается здесь.\n\nАбзац\nдва."
+    assert _kinds(text) == [
+        ("paragraph", "Первое предложение закончено."),
+        ("paragraph", "Вторая строка\nпродолжается здесь."),
+        ("paragraph", "Абзац\nдва."),
+    ]
+
+
+def test_heading_hints_override_classification():
+    text = "Обычная строка без признаков\nТекст под ней.\nЕщё одна строка\nТекст."
+    hints = {0: 1, text.index("Ещё одна"): 2}
+    fragments = _view(text, hints)
+    assert [(f.kind, f.section, f.text) for f in fragments] == [
+        ("heading", "1", "Обычная строка без признаков"),
+        ("paragraph", "1", "Текст под ней."),
+        ("heading", "1.1", "Ещё одна строка"),
+        ("paragraph", "1.1", "Текст."),
+    ]
+
+
+def test_hinted_numbered_line_keeps_number():
+    text = "Текст.\n3.2 Безопасность\nАбзац."
+    fragments = _view(text, {text.index("3.2"): 2})
+    assert (fragments[1].kind, fragments[1].section) == ("heading", "3.2")
+
+
+def test_long_list_item_is_split_and_keeps_kind_and_context():
+    sentence = "Это предложение средней длины для проверки деления текста. "
+    fragments = _view("Требования:\n- " + sentence * 60)
+    assert len(fragments) > 1
+    assert all(f.kind == "list_item" and f.context == "Требования:" for f in fragments)
+    assert all(len(f.text) <= MAX_FRAGMENT_CHARS for f in fragments)
+
+
+SPECS = Path(__file__).parent / "specs"
+REQUIREMENT = re.compile(r"\b(?:должен|должна|должно|должны|необходимо|обязан|обязана)\b", re.I)
+
+EXPECTED_HEADINGS = {
+    "gost_plain.txt": [
+        ("1", "1. Общие сведения"),
+        ("1.1", "1.1 Полное наименование системы"),
+        ("1.2", "1.2 Заказчик и исполнитель"),
+        ("1.3", "1.3 Основания для разработки"),
+        ("2", "2. Назначение и цели создания системы"),
+        ("3", "3. Характеристика объекта автоматизации"),
+        ("4", "4. Требования к системе"),
+        ("4.1", "4.1 Требования к функциям"),
+        ("4.2", "4.2 Требования к надёжности"),
+        ("4.3", "4.3 Требования к безопасности"),
+        ("5", "5. Порядок контроля и приёмки"),
+        ("ПА", "Приложение А"),
+    ],
+    "agile.md": [
+        ("1", "Планировщик спринтов"),
+        ("1.1", "Цели продукта"),
+        ("1.2", "Роли пользователей"),
+        ("1.3", "Модель доступа"),
+        ("2", "Обзор"),
+        ("2.1.1", "Создание задачи"),
+        ("2.2", "Отчёты"),
+    ],
+    "caps_email.txt": [
+        ("1", "ОБЩИЕ ПОЛОЖЕНИЯ"),
+        ("2", "ФУНКЦИОНАЛЬНЫЕ ТРЕБОВАНИЯ"),
+        ("3", "ТРЕБОВАНИЯ К БЕЗОПАСНОСТИ"),
+        ("4", "СРОКИ"),
+    ],
+    "mixed_traps.txt": [
+        ("1", "Раздел 1. Введение"),
+        ("2", "Раздел 2. Интеграции"),
+        ("II", "II. Архитектура"),
+        ("ПБ", "Приложение Б. Список сокращений"),
+    ],
+    "no_headings.txt": [],
+}
+
+
+def _load(name):
+    text = normalize((SPECS / name).read_text(encoding="utf-8"))
+    return text, split(text)
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_HEADINGS))
+def test_spec_samples_headings_offsets_and_requirements(name):
+    text, fragments = _load(name)
+    headings = [(f.section, f.text) for f in fragments if f.kind == "heading"]
+    assert headings == EXPECTED_HEADINGS[name]
+    for f in fragments:
+        assert text[f.start : f.end] == f.text
+        assert f.text == f.text.strip()
+        assert len(f.text) <= MAX_FRAGMENT_CHARS
+    content = " ".join(f.text for f in fragments if f.kind != "heading")
+    assert not any(REQUIREMENT.search(f.text) for f in fragments if f.kind == "heading")
+    assert len(REQUIREMENT.findall(content)) == len(REQUIREMENT.findall(text))
+
+
+def test_spec_gost_plain_numbered_requirements_and_paragraphs():
+    _, fragments = _load("gost_plain.txt")
+    items = [(f.section, f.text[:5]) for f in fragments if f.section.startswith("4.1.")]
+    assert items == [
+        ("4.1.1", "4.1.1 "),
+        ("4.1.2", "4.1.2 "),
+        ("4.1.3", "4.1.3 "),
+    ]
+    assert all(f.kind == "paragraph" for f in fragments if f.section.startswith("4.1."))
+    appendix = [f for f in fragments if f.section == "ПА"]
+    assert [f.kind for f in appendix] == ["heading", "paragraph"]
+
+
+def test_spec_agile_lists_have_context():
+    _, fragments = _load("agile.md")
+    items = [f for f in fragments if f.kind == "list_item"]
+    assert [(f.section, f.context) for f in items] == [
+        ("1.1", "Нужно решить три задачи:"),
+        ("1.1", "Нужно решить три задачи:"),
+        ("1.1", "Нужно решить три задачи:"),
+        ("2.1.1", "Поддерживаются поля:"),
+        ("2.1.1", "Поддерживаются поля:"),
+        ("2.1.1", "Поддерживаются поля:"),
+    ]
+    assert not any(f.text.startswith(("===", "---", "**")) for f in fragments)
+
+
+def test_spec_caps_email_wrapped_paragraphs_are_whole():
+    _, fragments = _load("caps_email.txt")
+    wrapped = next(f for f in fragments if f.text.startswith("Портал предназначен"))
+    assert wrapped.text.endswith("организаций.")
+    assert "\n" in wrapped.text
+    assert sum(f.kind == "paragraph" for f in fragments) == 6
+
+
+def test_spec_mixed_traps():
+    _, fragments = _load("mixed_traps.txt")
+    by_text = {f.text: f for f in fragments}
+    assert (
+        by_text["2024 год был успешным для компании, и объёмы заказов выросли."].kind == "paragraph"
+    )
+    assert by_text["100 пользователей должны работать одновременно без потери скорости."].kind == (
+        "paragraph"
+    )
+    items = [f for f in fragments if f.kind == "list_item"]
+    assert [f.text for f in items] == ["1. Вход", "2. Выход", "3. Профиль"]
+    assert {f.context for f in items} == {"Основные сценарии работы пользователя:"}
+    assert not any(f.text.endswith(":") for f in fragments)
+
+
+def test_spec_no_headings():
+    _, fragments = _load("no_headings.txt")
+    assert {f.kind for f in fragments} == {"paragraph", "list_item"}
+    assert {f.section for f in fragments} == {""}
+    assert {f.heading_path for f in fragments} == {""}
