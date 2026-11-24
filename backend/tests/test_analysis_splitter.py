@@ -349,11 +349,11 @@ def test_spec_samples_headings_offsets_and_requirements(name):
 
 def test_spec_gost_plain_numbered_requirements_and_paragraphs():
     _, fragments = _load("gost_plain.txt")
-    items = [(f.section, f.text[:5]) for f in fragments if f.section.startswith("4.1.")]
+    items = [(f.section, f.text[:5].strip()) for f in fragments if f.section.startswith("4.1.")]
     assert items == [
-        ("4.1.1", "4.1.1 "),
-        ("4.1.2", "4.1.2 "),
-        ("4.1.3", "4.1.3 "),
+        ("4.1.1", "4.1.1"),
+        ("4.1.2", "4.1.2"),
+        ("4.1.3", "4.1.3"),
     ]
     assert all(f.kind == "paragraph" for f in fragments if f.section.startswith("4.1."))
     appendix = [f for f in fragments if f.section == "ПА"]
