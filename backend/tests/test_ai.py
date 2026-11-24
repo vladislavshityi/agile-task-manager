@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 from app.core.config import get_settings
 from app.core.errors import AppError, ServiceUnavailable
-from app.modules.ai.client import Message, OllamaClient, get_llm
+from app.modules.ai.client import Message, OllamaClient, get_analysis_llm, get_llm
 from app.modules.ai.service import parse_drafts, strip_echoed_fields
 from app.modules.workspaces.models import Role
 from tests.conftest import Account, AddMember, BoardFixture, RegisterUser
@@ -335,7 +335,9 @@ def test_strip_echoed_fields_keeps_body():
 
 
 def _ollama(handler) -> OllamaClient:
-    return OllamaClient("http://ollama", "qwen2.5:3b", 5, transport=httpx.MockTransport(handler))
+    return OllamaClient(
+        "http://ollama", "qwen2.5:3b", 5, 4096, transport=httpx.MockTransport(handler)
+    )
 
 
 async def test_ollama_available_checks_installed_model():
@@ -355,6 +357,7 @@ async def test_ollama_stream_parses_ndjson():
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         assert payload["model"] == "qwen2.5:3b"
+        assert payload["options"]["num_ctx"] == 4096
         lines = [
             {"message": {"content": "При"}, "done": False},
             {"message": {"content": "вет"}, "done": False},
@@ -375,6 +378,39 @@ async def test_ollama_complete_passes_schema():
 
     reply = await _ollama(handler).complete([], schema={"type": "object"})
     assert reply == '{"ok": true}'
+
+
+async def test_ollama_complete_options_include_num_ctx():
+    seen: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(json.loads(request.content)["options"])
+        return httpx.Response(200, json={"message": {"content": "ok"}})
+
+    await _ollama(handler).complete([], schema={"type": "object"})
+    await _ollama(handler).complete([])
+    assert seen == [{"num_ctx": 4096, "temperature": 0.2}, {"num_ctx": 4096}]
+
+
+@pytest.mark.parametrize(
+    ("analysis_model", "expected"), [("qwen2.5:7b", "qwen2.5:7b"), ("", "qwen2.5:3b")]
+)
+def test_get_analysis_llm_model_selection(monkeypatch, analysis_model: str, expected: str):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "ollama_model", "qwen2.5:3b")
+    monkeypatch.setattr(settings, "ollama_analysis_model", analysis_model)
+    monkeypatch.setattr(settings, "ollama_num_ctx", 2048)
+    llm = get_analysis_llm()
+    assert llm.model == expected
+    assert llm.num_ctx == 2048  # type: ignore[attr-defined]
+    assert get_llm().model == "qwen2.5:3b"
+
+
+def test_get_analysis_llm_disabled(monkeypatch):
+    monkeypatch.setattr(get_settings(), "ai_enabled", False)
+    with pytest.raises(ServiceUnavailable) as exc:
+        get_analysis_llm()
+    assert exc.value.code == "ai_disabled"
 
 
 @pytest.mark.parametrize(

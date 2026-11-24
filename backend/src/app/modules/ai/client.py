@@ -35,11 +35,13 @@ class OllamaClient:
         base_url: str,
         model: str,
         timeout: float,
+        num_ctx: int,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = httpx.Timeout(timeout, connect=5.0)
+        self.num_ctx = num_ctx
         self.transport = transport
 
     def _client(self, timeout: httpx.Timeout | None = None) -> httpx.AsyncClient:
@@ -58,7 +60,8 @@ class OllamaClient:
         return any(_model_matches(name, self.model) for name in names)
 
     def _payload(self, messages: list[Message], **extra: Any) -> dict[str, Any]:
-        return {"model": self.model, "messages": messages, **extra}
+        options = {"num_ctx": self.num_ctx, **extra.pop("options", {})}
+        return {"model": self.model, "messages": messages, "options": options, **extra}
 
     def _raise_for_status(self, response: httpx.Response, body: bytes) -> None:
         if response.is_success:
@@ -80,7 +83,7 @@ class OllamaClient:
         payload = self._payload(messages, stream=False)
         if schema is not None:
             payload["format"] = schema
-            payload["options"] = {"temperature": 0.2}
+            payload["options"]["temperature"] = 0.2
         try:
             async with self._client() as client:
                 response = await client.post("/api/chat", json=payload)
@@ -113,10 +116,22 @@ class OllamaClient:
             raise ServiceUnavailable("Локальная модель недоступна", "ai_unavailable") from exc
 
 
-def get_llm() -> LLMClient:
+def _build_client(model: str) -> LLMClient:
     settings: Settings = get_settings()
     if not settings.ai_enabled:
         raise ServiceUnavailable("ИИ-ассистент отключён", "ai_disabled")
     return OllamaClient(
-        settings.ollama_base_url, settings.ollama_model, settings.ollama_timeout_seconds
+        settings.ollama_base_url,
+        model,
+        settings.ollama_timeout_seconds,
+        settings.ollama_num_ctx,
     )
+
+
+def get_llm() -> LLMClient:
+    return _build_client(get_settings().ollama_model)
+
+
+def get_analysis_llm() -> LLMClient:
+    settings = get_settings()
+    return _build_client(settings.ollama_analysis_model or settings.ollama_model)
