@@ -72,7 +72,7 @@ cd backend && uv run python scripts/seed_demo.py   # --api http://localhost:8080
 
 ```bash
 docker compose up -d db
-cd backend && uv run ruff check && uv run pytest
+cd backend && uv run ruff check && uv run ruff format --check && uv run pytest
 OLLAMA_LIVE=1 uv run pytest tests/test_ai_live.py   # с настоящей моделью
 cd ../frontend && npm run build && npm run lint
 ```
