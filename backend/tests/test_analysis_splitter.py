@@ -1,4 +1,5 @@
 import re
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -402,3 +403,90 @@ def test_spec_no_headings():
     assert {f.kind for f in fragments} == {"paragraph", "list_item"}
     assert {f.section for f in fragments} == {""}
     assert {f.heading_path for f in fragments} == {""}
+
+
+def _wrap(text, width=70):
+    return "\n".join(textwrap.wrap(text, width, break_long_words=False))
+
+
+def _paragraphs(fragments):
+    return [f for f in fragments if f.kind == "paragraph"]
+
+
+def test_hard_wrap_joins_lines_before_capital_or_digit():
+    sources = [
+        "Обмен данными с внешней бухгалтерской системой выполняется по протоколу "
+        "HTTPS каждые пятнадцать минут. Если связь недоступна, сервис повторяет "
+        "Запрос через равные промежутки времени до успешной передачи данных.",
+        "Максимальный размер загружаемого файла ограничен значением не более "
+        "20 мегабайт на один документ, а общий объём архива одного клиента "
+        "ограничен ста гигабайтами.",
+        "Отчёты формируются по запросу пользователя и доступны для скачивания в "
+        "течение тридцати дней. API отчётов доступен только авторизованным "
+        "сотрудникам отдела аналитики компании.",
+    ]
+    first = "Система должна принимать документы в формате\nPDF или DOCX и сохранять их в архиве."
+    text = normalize("\n\n".join([first, *(_wrap(s, 46) for s in sources)]) + "\n")
+    fragments = split(text)
+    paragraphs = _paragraphs(fragments)
+    assert len(paragraphs) == 4
+    assert paragraphs[0].text == first
+    assert all(p.text.endswith(".") for p in paragraphs)
+    for fragment in fragments:
+        assert text[fragment.start : fragment.end] == fragment.text
+
+
+def test_hard_wrap_at_seventy_chars_joins_lines_before_capital_or_digit():
+    text = normalize(
+        "Система должна принимать документы в формате PDF или DOCX и сохранять\n"
+        "Их в архиве. Размер файла не более двадцати мегабайт на один документ,\n"
+        "20 мегабайт для вложений и сто мегабайт для архивов.\n"
+        "\n"
+        "Обмен данными с внешней системой выполняется по протоколу HTTPS каждые\n"
+        "Пятнадцать минут. Если связь недоступна, сервис повторяет запрос через\n"
+        "равные промежутки времени до успешной передачи данных.\n"
+        "\n"
+        "Отчёты формируются по запросу пользователя и доступны для скачивания\n"
+        "API отчётов доступен только авторизованным сотрудникам отдела\n"
+        "аналитики компании в течение тридцати дней.\n"
+    )
+    fragments = split(text)
+    assert len(_paragraphs(fragments)) == 3
+    for fragment in fragments:
+        assert text[fragment.start : fragment.end] == fragment.text
+
+
+def test_word_paste_without_wrap_is_not_glued():
+    text = normalize(
+        "Система должна принимать документы в формате PDF и DOCX и хранить их.\n"
+        "Пользователь может искать документы по названию и дате загрузки в архиве.\n"
+        "Администратор управляет ролями и правами доступа сотрудников компании.\n"
+        "Отчёт формируется автоматически каждый месяц и отправляется руководителю.\n"
+        "Срок хранения документов составляет пять лет с момента их загрузки.\n"
+    )
+    fragments = split(text)
+    assert [f.text for f in _paragraphs(fragments)] == text.split("\n")
+
+
+def test_short_line_without_period_before_paragraph_is_not_glued():
+    text = normalize(
+        "Модуль отчётов\n"
+        + _wrap(
+            "Система формирует отчёты по задачам за выбранный период и позволяет "
+            "выгрузить их в файл. Каждый отчёт содержит сводку по исполнителям."
+        )
+        + "\n\n"
+        + _wrap(
+            "Пользователь выбирает период и тип отчёта на отдельной странице модуля, "
+            "после чего система строит таблицу. Результат можно сохранить."
+        )
+        + "\n"
+    )
+    fragments = split(text)
+    texts = [f.text for f in _paragraphs(fragments)] + [
+        f.text for f in fragments if f.kind == "heading"
+    ]
+    assert "Модуль отчётов" in texts
+    assert not any(t.startswith("Модуль отчётов\n") for t in texts)
+    for fragment in fragments:
+        assert text[fragment.start : fragment.end] == fragment.text

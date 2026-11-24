@@ -1,7 +1,9 @@
 """Split a requirements document into fragments (headings, paragraphs, list items).
 
 Classification is line by line. Every non-empty physical line is a logical line, except
-hard-wrapped text, where a line is glued to the previous one. Rules, in order; the first
+hard-wrapped text, where a line is glued to the previous one (it starts with a lowercase
+letter, or the previous line is long, has no sentence ending and the document is wrapped
+at a fixed width). Rules, in order; the first
 that matches wins, and when in doubt a line stays a paragraph:
 
 1. ``heading_hints`` (offset of line start -> level 1..6) from the document structure.
@@ -21,6 +23,7 @@ A line ending with ``:`` right before list items becomes their ``context``.
 """
 
 import re
+import statistics
 import unicodedata
 from typing import NamedTuple
 
@@ -34,6 +37,10 @@ MIN_CAPS_WORDS = 2
 MIN_CAPS_SHARE = 0.8
 NOT_HEADING_ENDINGS = ".,;:"
 SENTENCE_ENDINGS = ".!?:;…"
+WRAP_MIN_LINE_CHARS = 40
+WRAP_MIN_LINES = 3
+WRAP_MIN_OPEN_SHARE = 0.6
+WRAP_LONG_LINE_SHARE = 0.75
 
 _MD_HEADING = re.compile(r"^(#{1,6})\s+\S")
 _BOLD = re.compile(r"^(\*\*|__)\s*(\S.*?)\s*\1$")
@@ -202,7 +209,34 @@ def _head_of(text: str) -> _Head | None:
     return None
 
 
-def _continues(prev: _Line, line: _Line, hints: dict[int, int]) -> bool:
+def _wrap_width(text: str) -> int | None:
+    """Hard-wrap width of the document, or None when the text is not hard-wrapped.
+
+    The median length of the lines longer than WRAP_MIN_LINE_CHARS, provided there are
+    enough of them and most do not end a sentence (a Word paste, where a line is a whole
+    paragraph ending with a full stop, is not hard-wrapped).
+    """
+    lengths = []
+    open_lines = 0
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if len(line) > WRAP_MIN_LINE_CHARS:
+            lengths.append(len(line))
+            open_lines += line[-1] not in SENTENCE_ENDINGS
+    if len(lengths) < WRAP_MIN_LINES or open_lines < WRAP_MIN_OPEN_SHARE * len(lengths):
+        return None
+    return int(statistics.median(lengths))
+
+
+def _is_plain_line(line: _Line) -> bool:
+    """A line that cannot start a new element: not a list item, heading or numbered clause."""
+    if _LIST_MARKER.match(line.text) or _UNDERLINE.match(line.text) or _head_of(line.text):
+        return False
+    prefix = _prefix(line.text)
+    return not (prefix and prefix.form == "multi")
+
+
+def _continues(prev: _Line, line: _Line, hints: dict[int, int], wrap: int | None) -> bool:
     """True when `line` is a hard-wrapped continuation of `prev`."""
     if {prev.start, prev.begin, line.start, line.begin} & hints.keys():
         return False
@@ -210,14 +244,18 @@ def _continues(prev: _Line, line: _Line, hints: dict[int, int]) -> bool:
         return False
     if _LIST_MARKER.match(prev.text) and line.indent > prev.indent:
         return True
-    return (
-        prev.text[-1] not in SENTENCE_ENDINGS
-        and line.text[0].islower()
-        and not _LIST_MARKER.match(line.text)
-    )
+    if prev.text[-1] in SENTENCE_ENDINGS:
+        return False
+    if line.text[0].islower():
+        return not _LIST_MARKER.match(line.text)
+    if wrap is None:
+        return False
+    last_row = prev.text.rsplit("\n", 1)[-1]
+    return len(last_row) >= WRAP_LONG_LINE_SHARE * wrap and _is_plain_line(line)
 
 
 def _logical_lines(text: str, hints: dict[int, int]) -> list[_Line]:
+    wrap = _wrap_width(text)
     lines: list[_Line] = []
     offset = 0
     blank = True
@@ -227,7 +265,7 @@ def _logical_lines(text: str, hints: dict[int, int]) -> list[_Line]:
             indent = len(raw) - len(raw.lstrip())
             start = offset + indent
             line = _Line(start, start + len(stripped), stripped, indent, blank, offset)
-            if lines and not blank and _continues(lines[-1], line, hints):
+            if lines and not blank and _continues(lines[-1], line, hints, wrap):
                 prev = lines[-1]
                 lines[-1] = prev._replace(end=line.end, text=text[prev.start : line.end])
             else:
