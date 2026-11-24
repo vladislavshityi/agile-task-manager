@@ -159,3 +159,46 @@ export interface TaskInput {
   label_ids?: string[]
 }
 export type TaskPatch = Partial<TaskInput>
+
+export type AnalysisVisibility = 'private' | 'workspace'
+export type AnalysisAccess = 'read' | 'edit' | 'manage'
+export type FragmentKind = 'heading' | 'paragraph' | 'list_item'
+
+export interface SpecFragment {
+  id: string
+  ordinal: number
+  kind: FragmentKind
+  section: string
+  heading_path: string
+  context: string
+  text: string
+  start: number
+  end: number
+}
+
+export interface AnalysisMember {
+  user: User
+  can_edit: boolean
+}
+
+export interface AnalysisSummary {
+  id: string
+  workspace_id: string
+  title: string
+  visibility: AnalysisVisibility
+  created_by: User
+  created_at: string
+  fragment_count: number
+  access: AnalysisAccess
+}
+
+export interface Analysis extends AnalysisSummary {
+  text: string
+  fragments: SpecFragment[]
+  members: AnalysisMember[]
+}
+
+export interface AnalysisCreateInput {
+  title: string
+  text: string
+}

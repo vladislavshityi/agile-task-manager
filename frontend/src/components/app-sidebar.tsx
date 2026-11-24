@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useMatch } from 'react-router-dom'
-import { BookOpen, CalendarDays, CheckSquare, Home, KanbanSquare, Plus, Settings } from 'lucide-react'
+import { BookOpen, CalendarDays, CheckSquare, FileSearch, Home, KanbanSquare, Plus, Settings } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -56,6 +56,7 @@ export function AppSidebar() {
               <NavItem to={`${base}/my-tasks`} icon={CheckSquare} label="Мои задачи" />
               <NavItem to={`${base}/calendar`} icon={CalendarDays} label="Календарь" />
               <NavItem to={`${base}/wiki`} icon={BookOpen} label="База знаний" />
+              <NavItem to={`${base}/analysis`} icon={FileSearch} label="Анализ ТЗ" />
               <NavItem to={`${base}/settings`} icon={Settings} label="Настройки" />
             </SidebarMenu>
           </SidebarGroupContent>

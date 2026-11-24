@@ -15,4 +15,6 @@ export const qk = {
   wikiPage: (id: string) => ['wiki', id] as const,
   aiStatus: ['ai', 'status'] as const,
   invitePreview: (token: string) => ['invites', token] as const,
+  analyses: (wid: string) => ['workspaces', wid, 'analyses'] as const,
+  analysis: (id: string) => ['analyses', id] as const,
 }

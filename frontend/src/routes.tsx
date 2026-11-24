@@ -14,6 +14,8 @@ const MyTasksPage = lazy(() => import('@/features/tasks/pages/my-tasks-page'))
 const CalendarPage = lazy(() => import('@/features/tasks/pages/calendar-page'))
 const WikiPage = lazy(() => import('@/features/wiki/pages/wiki-page'))
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings-page'))
+const AnalysisListPage = lazy(() => import('@/features/analysis/pages/analysis-list-page'))
+const AnalysisPage = lazy(() => import('@/features/analysis/pages/analysis-page'))
 
 const lazyPage = (el: React.ReactNode) => <Suspense fallback={<Skeleton className="h-64 rounded-2xl" />}>{el}</Suspense>
 
@@ -35,6 +37,8 @@ export const router = createBrowserRouter([
           { path: 'calendar', element: lazyPage(<CalendarPage />) },
           { path: 'wiki', element: lazyPage(<WikiPage />) },
           { path: 'wiki/:pageId', element: lazyPage(<WikiPage />) },
+          { path: 'analysis', element: lazyPage(<AnalysisListPage />) },
+          { path: 'analysis/:analysisId', element: lazyPage(<AnalysisPage />) },
           { path: 'settings', element: lazyPage(<SettingsPage />) },
         ],
       },
