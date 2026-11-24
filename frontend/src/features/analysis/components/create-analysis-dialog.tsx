@@ -62,7 +62,7 @@ export function CreateAnalysisDialog({ workspaceId, open, onOpenChange, onCreate
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)}>Отмена</Button>
           <Button onClick={submit} disabled={create.isPending || !title.trim() || !text.trim()}>
-            {create.isPending ? 'Анализируем…' : 'Создать анализ'}
+            {create.isPending ? 'Создаём…' : 'Создать анализ'}
           </Button>
         </DialogFooter>
       </DialogContent>
